@@ -23,7 +23,6 @@ class BaseDataInstance:
     instance_lat: float
     instance_lon: float
     labelled_array: np.ndarray
-    surrounding_array: np.ndarray
 
     def isin(self, bounding_box: BoundingBox) -> bool:
         return (
@@ -58,8 +57,6 @@ class BaseEngineer(ABC):
         self.savedir.mkdir(exist_ok=True, parents=True)
 
         self.normalizing_dict_interim: Dict[str, Union[np.ndarray, int]] = {"n": 0}
-        self.ae_normalizing_dict_interim: Dict[str, Union[np.ndarray, int]] = {"n": 0}
-        self.surrounding_normalizing_dict_interim: Dict[str, Union[np.ndarray, int]] = {"n": 0}
 
     def get_geospatial_files(self, data_folder: Path) -> List[Path]:
         sentinel_files = data_folder / "raw" / self.sentinel_dataset
@@ -212,55 +209,6 @@ class BaseEngineer(ABC):
                 return None
         return np.nan_to_num(array, nan=nan)
 
-    @staticmethod
-    def get_surrounding_pixels(da: xr.DataArray, mid_lat_idx: int, mid_lon_idx: int) -> np.ndarray:
-
-        da_subset = da.isel(
-            x=[max(mid_lon_idx - 1, 0), mid_lon_idx, min(mid_lon_idx + 1, len(da.x) - 1),],
-            y=[max(mid_lat_idx - 1, 0), mid_lat_idx, min(mid_lat_idx + 1, len(da.y) - 1),],
-        )
-
-        da_np = da_subset.values
-        da_np = da_np.reshape(da_np.shape[0], da_np.shape[1], da_np.shape[2] * da_np.shape[3])
-        return np.moveaxis(da_np, -1, 0).mean(axis=0)
-
-    def process_autoencoder(
-        self,
-        da: xr.DataArray,
-        normal_array: Optional[np.ndarray],
-        add_ndvi: bool,
-        add_ndwi: bool,
-        nan_fill: float,
-        is_test: bool,
-        calculate_normalizing_dict: bool,
-        autoencoder_instances_per_label: int,
-    ) -> np.ndarray:
-
-        da_np = da.values
-        da_np = da_np.reshape(da_np.shape[0], da_np.shape[1], da_np.shape[2] * da_np.shape[3])
-        da_np = np.moveaxis(da_np, -1, 0)
-
-        # randomly choose indices
-        indices = random.sample(list(range(da_np.shape[0])), autoencoder_instances_per_label)
-        da_np = da_np[indices, :, :]
-
-        if add_ndvi:
-            da_np = self.calculate_ndvi(da_np, num_dims=3)
-        if add_ndwi:
-            da_np = self.calculate_ndwi(da_np, num_dims=3)
-
-        da_np = self.maxed_nan_to_num(da_np, nan=nan_fill, max_ratio=None)
-
-        if normal_array is not None:
-            # we can check stuff is the right shape
-            assert da_np.shape[1] == normal_array.shape[0]
-            assert da_np.shape[2] == normal_array.shape[1]
-
-        if (not is_test) and calculate_normalizing_dict:
-            self.update_batch_normalizing_values(self.ae_normalizing_dict_interim, da_np)
-
-        return da_np
-
     @abstractmethod
     def process_single_file(
         self,
@@ -273,9 +221,7 @@ class BaseEngineer(ABC):
         start_date: datetime,
         days_per_timestep: int,
         is_test: bool,
-        return_autoencoder_instances,
-        autoencoder_instances_per_label,
-    ) -> Tuple[Optional[BaseDataInstance], Optional[np.ndarray]]:
+    ) -> Optional[BaseDataInstance]:
         raise NotImplementedError
 
     @staticmethod
@@ -336,8 +282,6 @@ class BaseEngineer(ABC):
         include_extended_filenames: bool = True,
         calculate_normalizing_dict: bool = True,
         days_per_timestep: int = 30,
-        save_for_autoencoder: bool = False,
-        autoencoder_instances_per_label: int = 3,
     ):
         for file_path in tqdm(self.geospatial_files):
 
@@ -374,7 +318,7 @@ class BaseEngineer(ABC):
                 else:
                     data_subset = "training"
 
-            instance, autoencoder_instances = self.process_single_file(
+            instance = self.process_single_file(
                 file_path,
                 nan_fill=nan_fill,
                 max_nan_ratio=max_nan_ratio,
@@ -384,8 +328,6 @@ class BaseEngineer(ABC):
                 start_date=start_date,
                 days_per_timestep=days_per_timestep,
                 is_test=True if data_subset == "testing" else False,
-                return_autoencoder_instances=True if save_for_autoencoder else False,
-                autoencoder_instances_per_label=autoencoder_instances_per_label,
             )
             if instance is not None:
                 subset_path = self.savedir / data_subset
@@ -394,23 +336,9 @@ class BaseEngineer(ABC):
                 with save_path.open("wb") as f:
                     pickle.dump(instance, f)
 
-            if save_for_autoencoder and (autoencoder_instances is not None):
-                autoencoder_path = self.savedir / "autoencoder"
-                autoencoder_subset_path = autoencoder_path / data_subset
-                autoencoder_subset_path.mkdir(parents=True, exist_ok=True)
-
-                for idx in range(autoencoder_instances.shape[0]):
-                    ae_filename = f"{idx}_ae_{file_name}.npy"
-                    np.save(
-                        autoencoder_subset_path / ae_filename, autoencoder_instances[idx],
-                    )
-
         if calculate_normalizing_dict:
             normalizing_dict = self.calculate_normalizing_dict(
                 norm_dict=self.normalizing_dict_interim
-            )
-            surrounding_normalizing_dict = self.calculate_normalizing_dict(
-                norm_dict=self.surrounding_normalizing_dict_interim
             )
 
             if normalizing_dict is not None:
@@ -419,22 +347,3 @@ class BaseEngineer(ABC):
                     pickle.dump(normalizing_dict, f)
             else:
                 print("No normalizing dict calculated!")
-
-            if surrounding_normalizing_dict is not None:
-                save_path = self.savedir / "surrounding_normalizing_dict.pkl"
-                with save_path.open("wb") as f:
-                    pickle.dump(surrounding_normalizing_dict, f)
-            else:
-                print("No normalizing dict calculated!")
-
-            if save_for_autoencoder:
-                ae_normalizing_dict = self.calculate_normalizing_dict(
-                    norm_dict=self.ae_normalizing_dict_interim
-                )
-
-                if ae_normalizing_dict is not None:
-                    save_path = self.savedir / "autoencoder/ae_normalizing_dict.pkl"
-                    with save_path.open("wb") as f:
-                        pickle.dump(ae_normalizing_dict, f)
-                else:
-                    print("No normalizing dict calculated for autoencoder instances!")
