@@ -10,7 +10,6 @@ from src.exporters import (
     KenyaPVSentinelExporter,
     KenyaNonCropSentinelExporter,
     RegionalExporter,
-    KenyaOAFSentinelExporter,
     cancel_all_tasks,
 )
 
@@ -48,14 +47,8 @@ def export_region():
     )
 
 
-def export_oaf():
-    exporter = KenyaOAFSentinelExporter(Path("../data"))
-    exporter.export_for_labels(num_labelled_points=None, monitor=False, checkpoint=True)
-
-
 if __name__ == "__main__":
     export_geowiki_sentinel_ee()
     export_plant_village_sentinel_ee()
     export_kenya_non_crop()
     export_region()
-    export_oaf()
