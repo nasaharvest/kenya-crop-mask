@@ -17,10 +17,7 @@ class KenyaPVProcessor(BaseProcessor):
         dfs: List[geopandas.GeoDataFrame] = []
         for subfolder in subfolders:
             df = geopandas.read_file(
-                self.raw_folder
-                / "ref_african_crops_kenya_01_labels"
-                / subfolder
-                / "labels.geojson"
+                self.raw_folder / "ref_african_crops_kenya_01_labels" / subfolder / "labels.geojson"
             )
             df = df.rename(
                 columns={

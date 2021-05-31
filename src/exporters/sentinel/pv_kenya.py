@@ -71,14 +71,14 @@ class KenyaPVSentinelExporter(BaseSentinelExporter):
         for idx, row in tqdm(self.labels.iterrows()):
 
             try:
-                harvest_date = datetime.strptime(row["harvest_date"], "%Y-%m-%d %H:%M:%S").date()
+                harvest_date = datetime.strptime(row["harvest_date"], "%Y-%m-%dT%H:%M:%S").date()
             except ValueError:
                 continue
 
             # this is only used if end_month is not None
             overlapping_days: Optional[int] = 0
             if end_month is not None:
-                planting_date = datetime.strptime(row["planting_date"], "%Y-%m-%d %H:%M:%S").date()
+                planting_date = datetime.strptime(row["planting_date"], "%Y-%m-%dT%H:%M:%S").date()
 
                 end_year, overlapping_days = self.overlapping_year(
                     end_month, num_days, harvest_date, planting_date
