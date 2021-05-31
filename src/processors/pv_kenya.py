@@ -18,7 +18,6 @@ class KenyaPVProcessor(BaseProcessor):
         for subfolder in subfolders:
             df = geopandas.read_file(
                 self.raw_folder
-                / "kenya"
                 / "ref_african_crops_kenya_01_labels"
                 / subfolder
                 / "labels.geojson"
