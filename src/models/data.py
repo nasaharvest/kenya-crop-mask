@@ -12,16 +12,7 @@ from torch.utils.data import Dataset
 
 from src.exporters import GeoWikiExporter
 from src.exporters.sentinel.cloudfree import BANDS
-from src.processors import (
-    KenyaPVProcessor,
-    KenyaNonCropProcessor,
-    KenyaOAFProcessor,
-)
-
-from src.engineer.pv_kenya import PVKenyaDataInstance
-from src.engineer.kenya_non_crop import KenyaNonCropDataInstance
-from src.engineer.geowiki import GeoWikiDataInstance
-from src.engineer.one_acre_fund_kenya import KenyaOneAcreFundDataInstance
+from src.processors import KenyaPVProcessor, KenyaNonCropProcessor, GeoWikiProcessor
 
 from typing import cast, Tuple, Optional, List, Dict, Sequence, Union
 
@@ -34,7 +25,6 @@ class CropDataset(Dataset):
         self,
         data_folder: Path,
         subset: str,
-        probability_threshold: float,
         remove_b1_b10: bool,
         include_geowiki: bool,
         cache: bool,
@@ -43,7 +33,6 @@ class CropDataset(Dataset):
         normalizing_dict: Optional[Dict] = None,
     ) -> None:
 
-        self.probability_threshold = probability_threshold
         self.include_geowiki = include_geowiki
         self.upsample = upsample
 
@@ -69,7 +58,6 @@ class CropDataset(Dataset):
             KenyaPVProcessor.dataset,
             KenyaNonCropProcessor.dataset,
             GeoWikiExporter.dataset,
-            KenyaOAFProcessor.dataset,
         ]:
             files_and_nds.append(
                 self.load_files_and_normalizing_dicts(
@@ -323,19 +311,8 @@ class CropDataset(Dataset):
 
         is_global: float = 0.0
 
-        if isinstance(target_datainstance, PVKenyaDataInstance) or (
-            isinstance(target_datainstance, KenyaOneAcreFundDataInstance)
-        ):
-            # then, we know it is one of the plant village instances, and
-            # that it has a crop label
-            crop_int: int = 1
-
-        elif isinstance(target_datainstance, KenyaNonCropDataInstance):
-            crop_int = 0
-        else:
-            assert isinstance(target_datainstance, GeoWikiDataInstance) and self.include_geowiki
-            is_global = 1
-            crop_int = int(target_datainstance.crop_probability >= self.probability_threshold)
+        crop_int = int(target_datainstance.is_crop)
+        is_global = 1 if target_datainstance.dataset == GeoWikiProcessor.dataset else 0
 
         x = self.remove_bands(x=self._normalize(target_datainstance.labelled_array))
 

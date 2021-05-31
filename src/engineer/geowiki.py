@@ -2,18 +2,13 @@ from dataclasses import dataclass
 from datetime import datetime
 import pandas as pd
 from pathlib import Path
-import numpy as np
 import xarray as xr
 
 from typing import Optional
 
 from src.exporters import GeoWikiExporter, GeoWikiSentinelExporter
-from .base import BaseEngineer, BaseDataInstance
-
-
-@dataclass
-class GeoWikiDataInstance(BaseDataInstance):
-    crop_probability: float
+from src.config import PROBABILITY_THRESHOLD
+from .base import BaseEngineer, DataInstance
 
 
 class GeoWikiEngineer(BaseEngineer):
@@ -38,7 +33,7 @@ class GeoWikiEngineer(BaseEngineer):
         start_date: datetime,
         days_per_timestep: int,
         is_test: bool,
-    ) -> Optional[GeoWikiDataInstance]:
+    ) -> Optional[DataInstance]:
         r"""
         Return a tuple of np.ndarrays of shape [n_timesteps, n_features] for
         1) the anchor (labelled)
@@ -85,13 +80,14 @@ class GeoWikiEngineer(BaseEngineer):
             self.update_normalizing_values(self.normalizing_dict_interim, labelled_array)
 
         if labelled_array is not None:
-            return GeoWikiDataInstance(
+            return DataInstance(
                 label_lat=label_lat,
                 label_lon=label_lon,
-                crop_probability=crop_probability,
                 instance_lat=closest_lat,
                 instance_lon=closest_lon,
                 labelled_array=labelled_array,
+                is_crop=crop_probability >= PROBABILITY_THRESHOLD,
+                dataset=self.dataset,
             )
         else:
             return None

@@ -24,6 +24,7 @@ from .utils import tif_to_np, preds_to_xr
 from src.utils import set_seed
 from .forecaster import Forecaster
 from .classifier import Classifier
+from ..config import PROBABILITY_THRESHOLD
 
 from typing import cast, Callable, Tuple, Dict, Any, Type, Optional, List, Union
 
@@ -42,10 +43,6 @@ class Model(pl.LightningModule):
         is being run from the scripts directory) = "../data"
     :param hparams.learning_rate: The learning rate. Default = 0.001
     :param hparams.batch_size: The batch size. Default = 64
-    :param hparams.probability_threshold: The probability threshold to use to label GeoWiki
-        instances as crop / not_crop (since the GeoWiki labels are a mean crop probability, as
-        assigned by several labellers). In addition, this is the threshold used when calculating
-        metrics which require binary predictions, such as accuracy score. Default = 0.5
     :param hparams.input_months: The number of input months to pass to the model. If
         hparams.forecast is True, the remaining months will be forecasted. Otherwise, only the
         partial timeseries will be passed to the classifier. Default = 5
@@ -107,7 +104,6 @@ class Model(pl.LightningModule):
         return CropDataset(
             data_folder=self.data_folder,
             subset=subset,
-            probability_threshold=self.hparams.probability_threshold,
             remove_b1_b10=self.hparams.remove_b1_b10,
             normalizing_dict=normalizing_dict,
             include_geowiki=self.hparams.include_geowiki if subset != "testing" else False,
@@ -226,7 +222,7 @@ class Model(pl.LightningModule):
             # validation data
             output_dict[f"{prefix}roc_auc_score"] = roc_auc_score(labels, preds)
 
-        preds = (preds > self.hparams.probability_threshold).astype(int)
+        preds = (preds > PROBABILITY_THRESHOLD).astype(int)
 
         output_dict[f"{prefix}precision_score"] = precision_score(labels, preds)
         output_dict[f"{prefix}recall_score"] = recall_score(labels, preds)
@@ -470,7 +466,6 @@ class Model(pl.LightningModule):
             "--data_folder": (str, str(Path("../data"))),
             "--learning_rate": (float, 0.001),
             "--batch_size": (int, 64),
-            "--probability_threshold": (float, 0.5),
             "--input_months": (int, 5),
             "--alpha": (float, 10),
             "--noise_factor": (float, 0.1),
