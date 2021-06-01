@@ -6,7 +6,6 @@ from pathlib import Path
 import numpy as np
 import pickle
 from tqdm import tqdm
-import random
 import warnings
 import xarray as xr
 
@@ -17,12 +16,14 @@ from src.utils import BoundingBox
 
 
 @dataclass
-class BaseDataInstance:
+class DataInstance:
     label_lat: float
     label_lon: float
     instance_lat: float
     instance_lon: float
     labelled_array: np.ndarray
+    is_crop: bool
+    dataset: str
 
     def isin(self, bounding_box: BoundingBox) -> bool:
         return (
@@ -221,7 +222,7 @@ class BaseEngineer(ABC):
         start_date: datetime,
         days_per_timestep: int,
         is_test: bool,
-    ) -> Optional[BaseDataInstance]:
+    ) -> Optional[DataInstance]:
         raise NotImplementedError
 
     @staticmethod

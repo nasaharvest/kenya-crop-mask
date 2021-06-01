@@ -7,7 +7,6 @@ from src.processors import (
     GeoWikiProcessor,
     KenyaPVProcessor,
     KenyaNonCropProcessor,
-    KenyaOAFProcessor,
 )
 
 
@@ -26,13 +25,7 @@ def process_kenya_noncrop():
     processor.process()
 
 
-def process_one_acre():
-    processor = KenyaOAFProcessor(Path("../data"))
-    processor.process()
-
-
 if __name__ == "__main__":
     process_geowiki()
     process_plantvillage()
     process_kenya_noncrop()
-    process_one_acre()

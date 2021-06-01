@@ -17,7 +17,9 @@ These maps are available on Google Earth Engine:
 
 In addition, they are available on [Zenodo](https://doi.org/10.5281/zenodo.4271143).
 
-This model requires data from [Plant Village](https://plantvillage.psu.edu/) and [One Acre Fund](https://oneacrefund.org/). We thank those organizations for making these datasets available to us - please contact them if you are interested in accessing the data.
+The model which originally accompanied the [paper](https://www.climatechange.ai/papers/neurips2020/29) requires data from [Plant Village](https://plantvillage.psu.edu/) and [One Acre Fund](https://oneacrefund.org/). We thank those organizations for making these datasets available to us - please contact them if you are interested in accessing the data. The code used to process these datasets is available on the [`ccai_2020`](https://github.com/nasaharvest/kenya-crop-mask/tree/ccai_2020) branch of this repository.
+
+The main branch currently uses Plant Village's [open source dataset, hosted on MLHub](https://registry.mlhub.earth/10.34911/rdnt.u41j87/) (but copied into the `data folder` here for convenience).
 
 ## Pipeline
 

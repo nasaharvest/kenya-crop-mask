@@ -10,12 +10,7 @@ from typing import Optional
 
 from src.processors import KenyaNonCropProcessor
 from src.exporters import KenyaNonCropSentinelExporter
-from .base import BaseEngineer, BaseDataInstance
-
-
-@dataclass
-class KenyaNonCropDataInstance(BaseDataInstance):
-    is_crop: bool = False
+from .base import BaseEngineer, DataInstance
 
 
 class KenyaNonCropEngineer(BaseEngineer):
@@ -40,7 +35,7 @@ class KenyaNonCropEngineer(BaseEngineer):
         start_date: datetime,
         days_per_timestep: int,
         is_test: bool,
-    ) -> Optional[KenyaNonCropDataInstance]:
+    ) -> Optional[DataInstance]:
         r"""
         Return a tuple of np.ndarrays of shape [n_timesteps, n_features] for
         1) the anchor (labelled)
@@ -81,12 +76,14 @@ class KenyaNonCropEngineer(BaseEngineer):
             self.update_normalizing_values(self.normalizing_dict_interim, labelled_array)
 
         if labelled_array is not None:
-            return KenyaNonCropDataInstance(
+            return DataInstance(
                 label_lat=label_lat,
                 label_lon=label_lon,
                 instance_lat=closest_lat,
                 instance_lon=closest_lon,
                 labelled_array=labelled_array,
+                is_crop=False,
+                dataset=self.dataset,
             )
         else:
             return None

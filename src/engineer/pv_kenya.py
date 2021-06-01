@@ -1,9 +1,7 @@
 from dataclasses import dataclass
 import pandas as pd
 from pathlib import Path
-import numpy as np
 import geopandas
-import json
 from datetime import datetime
 
 from typing import Optional
@@ -11,31 +9,13 @@ from typing import Optional
 
 from src.processors import KenyaPVProcessor
 from src.exporters import KenyaPVSentinelExporter
-from .base import BaseEngineer, BaseDataInstance
-
-
-@dataclass
-class PVKenyaDataInstance(BaseDataInstance):
-
-    crop_label: str
-    crop_int: int
+from .base import BaseEngineer, DataInstance
 
 
 class PVKenyaEngineer(BaseEngineer):
 
     sentinel_dataset = KenyaPVSentinelExporter.dataset
     dataset = KenyaPVProcessor.dataset
-
-    def __init__(self, data_folder: Path) -> None:
-        super().__init__(data_folder)
-
-        unique_classes = self.labels.crop_type.unique()
-
-        self.classes_to_index = {
-            crop: idx for idx, crop in enumerate(unique_classes[unique_classes != np.array(None)])
-        }
-
-        json.dump(self.classes_to_index, (self.savedir / "classes_to_index.json").open("w"))
 
     @staticmethod
     def read_labels(data_folder: Path) -> pd.DataFrame:
@@ -54,7 +34,7 @@ class PVKenyaEngineer(BaseEngineer):
         start_date: datetime,
         days_per_timestep: int,
         is_test: bool,
-    ) -> Optional[PVKenyaDataInstance]:
+    ) -> Optional[DataInstance]:
         r"""
         Return a tuple of np.ndarrays of shape [n_timesteps, n_features] for
         1) the anchor (labelled)
@@ -80,40 +60,34 @@ class PVKenyaEngineer(BaseEngineer):
             label_lat = overlap.iloc[0].lat
             label_lon = overlap.iloc[0].lon
 
-            crop_type = overlap.iloc[0].crop_type
+            is_crop = bool(overlap.iloc[0].is_crop)
 
-            if crop_type is None:
-                return None
+            closest_lon, _ = self.find_nearest(da.x, label_lon)
+            closest_lat, _ = self.find_nearest(da.y, label_lat)
 
-            else:
-                crop_int = self.classes_to_index[crop_type]
+            labelled_np = da.sel(x=closest_lon).sel(y=closest_lat).values
 
-                closest_lon, _ = self.find_nearest(da.x, label_lon)
-                closest_lat, _ = self.find_nearest(da.y, label_lat)
+            if add_ndvi:
+                labelled_np = self.calculate_ndvi(labelled_np)
+            if add_ndwi:
+                labelled_np = self.calculate_ndwi(labelled_np)
 
-                labelled_np = da.sel(x=closest_lon).sel(y=closest_lat).values
+            labelled_array = self.maxed_nan_to_num(
+                labelled_np, nan=nan_fill, max_ratio=max_nan_ratio
+            )
 
-                if add_ndvi:
-                    labelled_np = self.calculate_ndvi(labelled_np)
-                if add_ndwi:
-                    labelled_np = self.calculate_ndwi(labelled_np)
+            if (not is_test) and calculate_normalizing_dict:
+                self.update_normalizing_values(self.normalizing_dict_interim, labelled_array)
 
-                labelled_array = self.maxed_nan_to_num(
-                    labelled_np, nan=nan_fill, max_ratio=max_nan_ratio
+            if labelled_array is not None:
+                return DataInstance(
+                    label_lat=label_lat,
+                    label_lon=label_lon,
+                    instance_lat=closest_lat,
+                    instance_lon=closest_lon,
+                    labelled_array=labelled_array,
+                    is_crop=is_crop,
+                    dataset=self.dataset,
                 )
-
-                if (not is_test) and calculate_normalizing_dict:
-                    self.update_normalizing_values(self.normalizing_dict_interim, labelled_array)
-
-                if labelled_array is not None:
-                    return PVKenyaDataInstance(
-                        label_lat=label_lat,
-                        label_lon=label_lon,
-                        instance_lat=closest_lat,
-                        instance_lon=closest_lon,
-                        labelled_array=labelled_array,
-                        crop_label=crop_type,
-                        crop_int=crop_int,
-                    )
-                else:
-                    return None
+            else:
+                return None
